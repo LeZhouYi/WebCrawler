@@ -344,3 +344,24 @@ class Crawler:
             const downloadName = '%s';
             downloadFile(downloadUrl, downloadName); 
         """ % (url, filename)
+
+    @staticmethod
+    def wait_child_element(parent_element: WebElement, by: str, by_value: str, wait_time: int = 30) -> Optional[WebElement]:
+        """
+        等待某元素并返回
+        :param parent_element: 父元素
+        :param by: 查找的类型
+        :param by_value: 查找类型对应的关键数据
+        :param wait_time: 等待最大时间/秒
+        :return: 返回找到的页面元素或None
+        """
+        for i in range(int(wait_time / 0.5)):
+            elements = parent_element.find_elements(by, by_value)
+            if len(elements) > 0:
+                try:
+                    if elements[0].is_displayed():
+                        return elements[0]
+                except Exception as e:
+                    print(e)
+            time.sleep(0.5)
+        raise ValueError("找不到元素:%s" % by_value)
