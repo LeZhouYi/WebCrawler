@@ -74,6 +74,9 @@ class Crawler:
             }
             self.driver = webdriver.Edge(options=edge_options)
             self.driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
+            self.driver.set_page_load_timeout(120)
+            self.driver.set_script_timeout(120)
+            self.driver.implicitly_wait(30)
         elif self.webdriver_type == "Chrome":
             chrome_options = ChromeOptions()
             chrome_options.add_argument("--start-fullscreen")  # 全屏
@@ -123,14 +126,14 @@ class Crawler:
         :param file_path: 完整的本地文件路径
         :param scale: pdf缩放比例[0.1,2]
         """
-        page_options = PrintOptions()
-        page_options.orientation = "landscape"
-        page_options.scale = scale
-        page_options.shrink_to_fit = True
-        page_options.background = True
-        info_pdf_content = self.driver.print_page(page_options)
+        pdf_data = self.driver.execute_cdp_cmd("Page.printToPDF", {
+            "printBackground": True,
+            "displayHeaderFooter": False,
+            "landscape": True,
+            "scale": scale
+        })
         with open(file_path, "wb") as file:
-            file.write(base64.b64decode(info_pdf_content))
+            file.write(base64.b64decode(pdf_data["data"]))
 
     def wait_download_file(self, filename: str, times: int = 30) -> bool:
         """等待下载文件"""
