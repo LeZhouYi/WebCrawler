@@ -21,7 +21,7 @@ from selenium.webdriver.support import expected_conditions as ec
 from typing_extensions import LiteralString
 
 from core.config.config import get_config
-
+from core.log.logger import logger
 
 class Crawler:
 
@@ -272,8 +272,11 @@ class Crawler:
         windows = self.driver.window_handles
         if len(windows) > 1:
             for window in windows[1:]:
-                self.driver.switch_to.window(window)
-                self.driver.close()
+                try:
+                    self.driver.switch_to.window(window)
+                    self.driver.close()
+                except Exception as e:
+                    logger.warning("关闭窗口失败：%s"%e)
         self.driver.switch_to.window(windows[0])
 
     @staticmethod
@@ -368,3 +371,14 @@ class Crawler:
                     print(e)
             time.sleep(0.5)
         raise ValueError("找不到元素:%s" % by_value)
+
+    @staticmethod
+    def gen_url_download_script(url):
+        return """
+            const link = document.createElement('a');
+            link.href = '%s';
+            link.setAttribute('download', '');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        """%url
