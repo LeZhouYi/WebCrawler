@@ -164,3 +164,5 @@ cython_debug/
 #.idea/
 .idea/misc.xml
 .idea/WebCrawler.iml
+
+/data
