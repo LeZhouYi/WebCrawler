@@ -4,16 +4,13 @@ import re
 import shutil
 import time
 from typing import Optional, Union
-from urllib.parse import unquote
 
-import requests
 from pywinauto import Desktop, Application
 from selenium.webdriver.common import action_chains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
 from selenium import webdriver
-from selenium.webdriver.common.print_page_options import PrintOptions
 from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.support.wait import WebDriverWait
@@ -23,102 +20,82 @@ from typing_extensions import LiteralString
 from core.config.config import get_config
 from core.log.logger import logger
 
-class Crawler:
+class WebCrawler:
 
     def __init__(self):
         self.driver = None  # 浏览器驱动
         self.download_dir = None  # 下载文件夹
         self.webdriver_type = get_config("webdriver_type")  # 驱动类型
+        self.download_dir = os.path.join(os.getcwd(), get_config("download_dir"))  # 设置浏览器下载路径
+        assert os.path.exists(self.download_dir)
 
     def init_webdriver(self):
         """初始化浏览器驱动"""
-        self.download_dir = os.path.join(os.getcwd(), get_config("download_dir"))
-        assert os.path.exists(self.download_dir)
         if self.webdriver_type == "Edge":
-            edge_options = EdgeOptions()
-            if get_config("browser_gui_mode") == "nogui":
-                edge_options.add_argument("--headless")  # 无窗口模式
-            edge_options.add_argument("--disable-infobars")  # 禁用信息弹窗
-            edge_options.add_argument("--disable-gpu")  # 禁用gpu加速
-            edge_options.add_argument("--window-position=0,0")  # 浏览器位置
-            edge_options.add_argument("--window-size=1920,1080")  # 浏览器大小
-            edge_options.add_argument("--disable-notifications")
-            edge_options.add_argument("--no-download-notification")
-            edge_options.add_argument("--safebrowsing-disable-download-protection")
-            edge_options.add_argument("--disable-software-rasterizer")
-            # 添加实验性功能，用于设置下载路径
-            prefs = {
-                "browser": {
-                    "show_hub_popup_on_download_start": False
-                },
-                "download": {
-                    "default_directory": self.download_dir,
-                    "prompt_for_download": False,
-                    "directory_upgrade": True
-                },
-                "user_experience": {
-                    "personalization_data_consent_enabled": True
-                },
-                "download.neverAsk.saveToDisk": "application/domain-of-my-app",
-                "safebrowsing.enabled": True,
-                "profile.default_content_settings.popups": 0,
-                "profile.default_content_setting_values.automatic_downloads": 1,
-                "profile.default_content_setting_values.notifications": 2,
-                "profile.content_settings.pattern_pairs.*,*.multiple-automatic-downloads": 1
-            }
-            edge_options.add_experimental_option("prefs", prefs)
-            # edge_options.add_experimental_option("excludeSwitches", ["disable-popup-blocking"])
-            params = {
-                "behavior": "allow",
-                "downloadPath": self.download_dir
-            }
-            self.driver = webdriver.Edge(options=edge_options)
-            self.driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
-            self.driver.set_page_load_timeout(120)
-            self.driver.set_script_timeout(120)
-            self.driver.implicitly_wait(30)
+            self.init_edge_driver()
         elif self.webdriver_type == "Chrome":
-            chrome_options = ChromeOptions()
-            chrome_options.add_argument("--start-fullscreen")  # 全屏
-            if get_config("browser_gui_mode") == "nogui":
-                chrome_options.add_argument("--headless")  # 无窗口模式
-            # 设置下载路径
-            chrome_options.add_experimental_option("prefs", {
-                "download.default_directory": self.download_dir,
-                "download.prompt_for_download": False,
-                "download.directory_upgrade": True,
-                "safebrowsing.enabled": False
-            })
-            chrome_options.add_argument("--disable-infobars")  # 禁用信息弹窗
-            chrome_options.add_argument("--disable-gpu")  # 禁用gpu加速
-            chrome_options.add_argument("--window-position=0,0")  # 浏览器位置
-            chrome_options.add_argument("--window-size=1920,1080")  # 浏览器大小
-            self.driver = webdriver.Chrome(options=chrome_options)
+            self.init_chrome_driver()
 
-    @staticmethod
-    def unquote_file_name(file_name: str) -> str:
-        """
-        将url编码格式的文件名转成当前系统合适的文件名
-        :param file_name: 未编码的文件名
-        :return: 编码转换后的文件名
-        """
-        return unquote(file_name)
+    def init_chrome_driver(self):
+        """初始化Chrome"""
+        chrome_options = ChromeOptions()
+        chrome_options.add_argument("--start-fullscreen")  # 全屏
+        if get_config("browser_gui_mode") == "nogui":
+            chrome_options.add_argument("--headless")  # 无窗口模式
+        # 设置下载路径
+        chrome_options.add_experimental_option("prefs", {
+            "download.default_directory": self.download_dir,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": False
+        })
+        chrome_options.add_argument("--disable-infobars")  # 禁用信息弹窗
+        chrome_options.add_argument("--disable-gpu")  # 禁用gpu加速
+        chrome_options.add_argument("--window-position=0,0")  # 浏览器位置
+        chrome_options.add_argument("--window-size=1920,1080")  # 浏览器大小
+        self.driver = webdriver.Chrome(options=chrome_options)
 
-    @staticmethod
-    def download_file(url: str, file_path: Union[LiteralString, str, bytes]) -> bool:
-        """
-        下载文件到本地
-        :param url: 文件链接
-        :param file_path: 完整的本地文件路径
-        :return: true->下载成功
-        """
-        response = requests.get(url, stream=True)
-        if response.status_code == 200:
-            with open(file_path, "wb") as file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    file.write(chunk)
-            return True
-        return False
+    def init_edge_driver(self):
+        """初始化Edge"""
+        edge_options = EdgeOptions()
+        if get_config("browser_gui_mode") == "nogui":
+            edge_options.add_argument("--headless")  # 无窗口模式
+        edge_options.add_argument("--disable-infobars")  # 禁用信息弹窗
+        edge_options.add_argument("--disable-gpu")  # 禁用gpu加速
+        edge_options.add_argument("--window-position=0,0")  # 浏览器位置
+        edge_options.add_argument("--window-size=1920,1080")  # 浏览器大小
+        edge_options.add_argument("--disable-notifications")  # 禁用通知
+        edge_options.add_argument("--no-download-notification")  # 禁用下载通知
+        edge_options.add_argument("--safebrowsing-disable-download-protection")  # 禁用下载安全警告
+        edge_options.add_argument("--disable-software-rasterizer")
+        # 添加实验性功能，用于设置下载路径
+        prefs = {
+            "browser": {
+                "show_hub_popup_on_download_start": False
+            },
+            "download": {
+                "default_directory": self.download_dir,
+                "prompt_for_download": False,
+                "directory_upgrade": True
+            },
+            "user_experience": {
+                "personalization_data_consent_enabled": True
+            },
+            "download.neverAsk.saveToDisk": "application/domain-of-my-app",
+            "safebrowsing.enabled": True,
+            "profile.default_content_settings.popups": 0,
+            "profile.default_content_setting_values.automatic_downloads": 1,
+            "profile.default_content_setting_values.notifications": 2,
+            "profile.content_settings.pattern_pairs.*,*.multiple-automatic-downloads": 1
+        }
+        edge_options.add_experimental_option("prefs", prefs)
+        params = {
+            "behavior": "allow",
+            "downloadPath": self.download_dir
+        }
+        self.driver = webdriver.Edge(options=edge_options)
+        self.driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
+
 
     def save_page(self, file_path: str, scale: float = 1.0):
         """
@@ -218,14 +195,8 @@ class Crawler:
         self.driver.execute_script("arguments[0].click();", element)
         time.sleep(1)
 
-    def click_element_by_index(self, by: str, value: str, index: int = 0):
-        elements = self.driver.find_elements(by, value)
-        self.driver.execute_script("arguments[0].scrollIntoView();", elements[index])
-        action_chains.ActionChains(self.driver).move_to_element(elements[index]).perform()
-        self.driver.execute_script("arguments[0].click();", elements[index])
-        time.sleep(1)
-
     def click_element_by_element(self, element: WebElement):
+        """点击元素"""
         self.driver.execute_script("arguments[0].scrollIntoView();", element)
         action_chains.ActionChains(self.driver).move_to_element(element).perform()
         self.driver.execute_script("arguments[0].click();", element)
@@ -280,30 +251,30 @@ class Crawler:
         self.driver.switch_to.window(windows[0])
 
     @staticmethod
-    def get_open_file_handle(browser_pattern: str = r"^[\S\s]+Microsoft[\s\S]+Edge$"):
+    def get_open_file_handle(browser_pattern: str = r"^[\S\s]+Microsoft[\s\S]+Edge$", open_text: str ="打开"):
         """获取浏览器句柄"""
         desktop = Desktop(backend="uia")
         windows = desktop.windows()
         # 遍历所有窗口，打印窗口标题和句柄
         for window in windows:
             if re.match(browser_pattern, window.window_text()):
-                # if str(window.window_text()).find("Microsoft​ Edge") > -1:
                 app = Application(backend="uia").connect(handle=window.handle)
                 main_browser = app.windows()[0]
-                if len(main_browser.children(title="打开")) > 0:
+                if len(main_browser.children(title=open_text)) > 0:
                     return window.handle
         return None
 
     @staticmethod
-    def upload_file_by_window(handle, filepath: Union[LiteralString, str, bytes]):
+    def upload_file_by_window(handle, filepath: Union[LiteralString, str, bytes], open_text: str ="打开",
+                              input_text: str ="文件名(N):", confirm_text: str = "打开(O)"):
         """通过浏览器上传文件"""
         app = Application(backend="uia").connect(handle=handle)
         main_browser = app.windows()[0]
-        file_chooser = main_browser.children(title="打开")[0]
-        path_input = file_chooser.descendants(title="文件名(N):", control_type="Edit")[0]
+        file_chooser = main_browser.children(title=open_text)[0]
+        path_input = file_chooser.descendants(title=input_text, control_type="Edit")[0]
         # 输入文件
         path_input.set_text(filepath)
-        open_button = file_chooser.descendants(title="打开(O)", control_type="Button")[0]
+        open_button = file_chooser.descendants(title=confirm_text, control_type="Button")[0]
         open_button.click()
 
     def into_frame_by_id(self, frame_id: str, timeout: int = 30):
@@ -313,43 +284,6 @@ class Crawler:
     def into_frame_by_name(self, frame_name: str, timeout: int = 30):
         """进入iframe"""
         WebDriverWait(self.driver, timeout).until(ec.frame_to_be_available_and_switch_to_it((By.NAME, frame_name)))
-
-    @staticmethod
-    def delete_file(filepath: Union[LiteralString, str, bytes]) -> bool:
-        """删除本地文件"""
-        try:
-            os.remove(filepath)
-            return True
-        except OSError:
-            return False
-
-    @staticmethod
-    def gen_download_script(url: str, filename: str) -> str:
-        """生成下载文件的脚本"""
-        return """
-            async function downloadFile(fileUrl, filename){
-                try{
-                    const response = await fetch(fileUrl);
-                    if (!response.ok){
-                        throw new Error('FailDownload');
-                    }
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                } catch (error) {
-                    console.error(error);
-                }
-            }
-            const downloadUrl = '%s';
-            const downloadName = '%s';
-            downloadFile(downloadUrl, downloadName); 
-        """ % (url, filename)
 
     @staticmethod
     def wait_child_element(parent_element: WebElement, by: str, by_value: str, wait_time: int = 30) -> Optional[WebElement]:
@@ -372,13 +306,19 @@ class Crawler:
             time.sleep(0.5)
         raise ValueError("找不到元素:%s" % by_value)
 
-    @staticmethod
-    def gen_url_download_script(url):
-        return """
-            const link = document.createElement('a');
-            link.href = '%s';
-            link.setAttribute('download', '');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        """%url
+    def full_load_scroll(self, scroll_element):
+        """完全滚动到内容底部，使其内容完全加载"""
+        check_script = """
+                    var element = arguments[0];
+                    return element.scrollTop + element.clientHeight >= element.scrollHeight;
+                """
+        scroll_script = """
+                    var element = arguments[0];
+                    element.scrollTop = element.scrollHeight - element.clientHeight;
+                """
+        for _ in range(20):
+            self.driver.execute_script(scroll_script, scroll_element)
+            time.sleep(2)
+            is_to_bottom = self.driver.execute_script(check_script, scroll_element)
+            if is_to_bottom:
+                break
