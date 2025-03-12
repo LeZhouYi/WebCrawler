@@ -17,7 +17,16 @@ class WindowCrawler:
 
     def init_window_crawler(self):
         self.download_dir = os.path.join(os.getcwd(), get_config("download_dir"))
-        assert os.path.exists(self.download_dir)
+        os.makedirs(self.download_dir, exist_ok=True)
+
+    @staticmethod
+    def find_child_elements(wrapper, title_pattern):
+        """通过标题查找子元素"""
+        elements = []
+        for children in wrapper.descendants():
+            if re.match(title_pattern, children.window_text()):
+                elements.append(children)
+        return elements
 
     @staticmethod
     def download_file(url: str, file_path: Union[LiteralString, str, bytes]) -> bool:
@@ -45,101 +54,63 @@ class WindowCrawler:
             return False
 
     @staticmethod
-    def find_windows(name_pattern: str):
-        """等待窗口出现并返回"""
+    def find_app_by_child_name(child_name: str):
+        """通过窗口的子元素来匹配应用"""
         desktop = Desktop(backend="uia")
-        windows = desktop.windows()
-        # 遍历所有窗口，打印窗口标题和句柄
-        match_windows = []
-        for window in windows:
-            if re.match(name_pattern, window.window_text()):
-                match_windows.append(window)
-        return match_windows
-
-    @staticmethod
-    def wait_window(name_pattern: str, children_title: str, wait_time: int = 30):
-        """等待窗口出现并返回"""
-        for i in range(wait_time):
-            desktop = Desktop(backend="uia")
-            windows = desktop.windows()
-            # 遍历所有窗口，打印窗口标题和句柄
-            for window in windows:
-                if re.match(name_pattern, window.window_text()):
-                    app = Application(backend="uia").connect(handle=window.handle)
-                    main_window = app.windows()[0]
-                    if len(main_window.children(title=children_title)) > 0:
-                        return app
-            time.sleep(1)
-        raise Exception("等待窗口名称匹配：%s 并且子元素包含标题：%s 的窗口不存在" % (name_pattern, children_title))
-
-    @staticmethod
-    def wait_window_default(name_pattern: str, wait_time: int = 30):
-        """等待窗口出现并返回"""
-        for i in range(wait_time):
-            desktop = Desktop(backend="uia")
-            windows = desktop.windows()
-            # 遍历所有窗口，打印窗口标题和句柄
-            for window in windows:
-                if re.match(name_pattern, window.window_text()):
-                    app = Application(backend="uia").connect(handle=window.handle)
+        app_window_handles = desktop.windows()
+        for app_window_handle in app_window_handles:
+            app = Application(backend="uia").connect(handle=app_window_handle.handle)
+            for app_window in app.windows():
+                if len(app_window.descendants(title=child_name)) > 0:
                     return app
-            time.sleep(1)
-        raise Exception("等待窗口名称匹配：%s 的窗口不存在" % name_pattern)
+        return None
 
     @staticmethod
-    def find_child_window(window, title_pattern):
-        """通过标题查找子元素"""
-        for children in window.children():
-            if re.match(title_pattern, children.window_text()):
-                return children
-        raise Exception("查找子元素名称匹配：%s 时找不到" % title_pattern)
+    def wait_app_by_child_name(child_name: str, timeout: int = 30):
+        """等待出现匹配的APP"""
+        for _ in range(int(timeout / 6)):
+            desktop = Desktop(backend="uia")
+            app_window_handles = desktop.windows()
+            for app_window_handle in app_window_handles:
+                app = Application(backend="uia").connect(handle=app_window_handle.handle)
+                for app_window in app.windows():
+                    if len(app_window.descendants(title=child_name)) > 0:
+                        return app
+            time.sleep(5)
+        raise Exception("找不到APP匹配子元素为 %s " % child_name)
 
     @staticmethod
-    def find_child_element(wrapper, title_pattern):
-        """通过标题查找子元素"""
-        for children in wrapper.descendants():
-            if re.match(title_pattern, children.window_text()):
-                return children
-        raise Exception("查找子元素名称匹配：%s 时找不到" % title_pattern)
+    def find_child_window(app: Application, child_name: str):
+        """查找子窗口"""
+        for app_window in app.windows():
+            if app_window.window_text() == child_name:
+                return app_window
+        return None
 
     @staticmethod
-    def find_child_elements(wrapper, title_pattern):
-        """通过标题查找子元素"""
-        elements = []
-        for children in wrapper.descendants():
-            if re.match(title_pattern, children.window_text()):
-                elements.append(children)
-        return elements
+    def find_child_element_starts(app: Application, start_text: str):
+        """以开头字符串匹配窗口"""
+        for app_window in app.windows():
+            for child in app_window.descendants():
+                if str(child.window_text()).startswith(start_text):
+                    return child
+        return None
 
     @staticmethod
-    def wait_child_element(wrapper, title_pattern, wait_time: int = 30):
-        for i in range(wait_time):
-            for children in wrapper.descendants():
-                if re.match(title_pattern, children.window_text()):
-                    return children
-            time.sleep(1)
-        raise Exception("查找子元素名称匹配：%s 时找不到" % title_pattern)
+    def find_child_element_full(app: Application, start_text: str):
+        """以开头字符串匹配窗口"""
+        for app_window in app.windows():
+            if app_window.window_text() == start_text:
+                return app_window
+            for child in app_window.descendants():
+                if child.window_text() == start_text:
+                    return child
+        return None
 
     @staticmethod
-    def wait_child_window(window, title_pattern, wait_time: int = 30):
-        """等待子元素窗口"""
-        for i in range(wait_time):
-            for children in window.children():
-                if re.match(title_pattern, children.window_text()):
-                    return children
-            time.sleep(1)
-        raise Exception("等待子元素名称匹配：%s 时找不到" % title_pattern)
-
-    @staticmethod
-    def wait_child_window_disappear(window, title_pattern, wait_time: int = 30):
-        """等待子元素消失"""
-        for i in range(wait_time):
-            is_disappear = True
-            for children in window.children():
-                if re.match(title_pattern, children.window_text()):
-                    is_disappear = False
-                    break
-            if is_disappear:
-                return
-            time.sleep(1)
-        raise Exception("等待子元素名称匹配：%s 消失时，等待%s秒后仍存在" % (title_pattern, wait_time))
+    def find_child_element(window, child_name: str):
+        """查找子元素"""
+        for child in window.descendants():
+            if child.window_text() == child_name:
+                return child
+        raise Exception("元素：%s 找不到" % child_name)

@@ -17,85 +17,40 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from typing_extensions import LiteralString
 
-from core.config.config import get_config
+from core.common.crawl_utils import to_lower_str
+from core.config.config import get_config_by_section
 from core.log.logger import logger
 
 class WebCrawler:
 
     def __init__(self):
         self.driver = None  # 浏览器驱动
-        self.download_dir = None  # 下载文件夹
-        self.webdriver_type = get_config("webdriver_type")  # 驱动类型
-        self.download_dir = os.path.join(os.getcwd(), get_config("download_dir"))  # 设置浏览器下载路径
-        assert os.path.exists(self.download_dir)
+        self.webdriver_type = to_lower_str(get_config_by_section("webdriver","browser_type")) # 驱动类型
+        self.download_path = os.path.join(os.getcwd(), get_config_by_section("webdriver","download_path"))  # 设置浏览器下载路径
+        os.makedirs(self.download_path, exist_ok=True)
 
     def init_webdriver(self):
         """初始化浏览器驱动"""
-        if self.webdriver_type == "Edge":
+        if self.webdriver_type == "edge":
             self.init_edge_driver()
-        elif self.webdriver_type == "Chrome":
+        elif self.webdriver_type == "chrome":
             self.init_chrome_driver()
 
     def init_chrome_driver(self):
         """初始化Chrome"""
         chrome_options = ChromeOptions()
-        chrome_options.add_argument("--start-fullscreen")  # 全屏
-        if get_config("browser_gui_mode") == "nogui":
-            chrome_options.add_argument("--headless")  # 无窗口模式
-        # 设置下载路径
-        chrome_options.add_experimental_option("prefs", {
-            "download.default_directory": self.download_dir,
-            "download.prompt_for_download": False,
-            "download.directory_upgrade": True,
-            "safebrowsing.enabled": False
-        })
-        chrome_options.add_argument("--disable-infobars")  # 禁用信息弹窗
-        chrome_options.add_argument("--disable-gpu")  # 禁用gpu加速
-        chrome_options.add_argument("--window-position=0,0")  # 浏览器位置
-        chrome_options.add_argument("--window-size=1920,1080")  # 浏览器大小
         self.driver = webdriver.Chrome(options=chrome_options)
 
     def init_edge_driver(self):
         """初始化Edge"""
         edge_options = EdgeOptions()
-        if get_config("browser_gui_mode") == "nogui":
-            edge_options.add_argument("--headless")  # 无窗口模式
-        edge_options.add_argument("--disable-infobars")  # 禁用信息弹窗
-        edge_options.add_argument("--disable-gpu")  # 禁用gpu加速
-        edge_options.add_argument("--window-position=0,0")  # 浏览器位置
-        edge_options.add_argument("--window-size=1920,1080")  # 浏览器大小
-        edge_options.add_argument("--disable-notifications")  # 禁用通知
-        edge_options.add_argument("--no-download-notification")  # 禁用下载通知
-        edge_options.add_argument("--safebrowsing-disable-download-protection")  # 禁用下载安全警告
-        edge_options.add_argument("--disable-software-rasterizer")
-        # 添加实验性功能，用于设置下载路径
-        prefs = {
-            "browser": {
-                "show_hub_popup_on_download_start": False
-            },
-            "download": {
-                "default_directory": self.download_dir,
-                "prompt_for_download": False,
-                "directory_upgrade": True
-            },
-            "user_experience": {
-                "personalization_data_consent_enabled": True
-            },
-            "download.neverAsk.saveToDisk": "application/domain-of-my-app",
-            "safebrowsing.enabled": True,
-            "profile.default_content_settings.popups": 0,
-            "profile.default_content_setting_values.automatic_downloads": 1,
-            "profile.default_content_setting_values.notifications": 2,
-            "profile.content_settings.pattern_pairs.*,*.multiple-automatic-downloads": 1
-        }
-        edge_options.add_experimental_option("prefs", prefs)
-        params = {
-            "behavior": "allow",
-            "downloadPath": self.download_dir
-        }
+        edge_config = get_config_by_section("webdriver", self.webdriver_type)
+        for argument in edge_config["arguments"]:
+            edge_options.add_argument(argument)
+        edge_options.add_experimental_option("prefs",edge_config["prefs"])
         self.driver = webdriver.Edge(options=edge_options)
-        self.driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
-
+        for cmd,cmd_args in edge_config["params"].items():
+            self.driver.execute_cdp_cmd(cmd,cmd_args)
 
     def save_page(self, file_path: str, scale: float = 1.0):
         """
@@ -116,7 +71,7 @@ class WebCrawler:
         """等待下载文件"""
         des_file = self.format_download_file_name(filename)
         for _ in range(times):
-            for file_name in os.listdir(self.download_dir):
+            for file_name in os.listdir(self.download_path):
                 format_name = self.format_download_file_name(file_name)
                 if des_file.endswith(format_name) and not file_name.endswith(".crdownload"):
                     return True
@@ -131,10 +86,10 @@ class WebCrawler:
         :return: true->操作成功；False->找不到文件
         """
         des_file = self.format_download_file_name(des_file)
-        for file_name in os.listdir(self.download_dir):
+        for file_name in os.listdir(self.download_path):
             format_name = self.format_download_file_name(file_name)
             if des_file.endswith(format_name) and not file_name.endswith(".crdownload"):
-                file_path = os.path.join(self.download_dir, file_name)
+                file_path = os.path.join(self.download_path, file_name)
                 des_file_path = os.path.join(des_path, file_name)
                 if os.path.exists(des_file_path):
                     os.remove(des_file_path)
@@ -322,3 +277,11 @@ class WebCrawler:
             is_to_bottom = self.driver.execute_script(check_script, scroll_element)
             if is_to_bottom:
                 break
+
+    def clear_download(self):
+        """清理下载文件夹"""
+        try:
+            shutil.rmtree(self.download_path)
+            os.makedirs(self.download_path, exist_ok=True)
+        except Exception as e:
+            logger.warning("清理下载文件夹失败:%s"%e)

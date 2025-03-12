@@ -1,3 +1,8 @@
+def to_lower_str(value: any) -> str:
+    """转小写字符串"""
+    return str(value).strip().lower()
+
+
 def gen_download_script(url: str, filename: str) -> str:
     """生成下载文件的脚本"""
     return """
@@ -25,6 +30,7 @@ def gen_download_script(url: str, filename: str) -> str:
         downloadFile(downloadUrl, downloadName); 
     """ % (url, filename)
 
+
 def gen_url_download_script(url):
     return """
         const link = document.createElement('a');
@@ -33,4 +39,4 @@ def gen_url_download_script(url):
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-    """%url
+    """ % url
