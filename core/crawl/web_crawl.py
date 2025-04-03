@@ -5,6 +5,7 @@ import shutil
 import time
 from typing import Optional, Union
 
+from PIL import ImageGrab
 from pywinauto import Desktop, Application
 from selenium.webdriver.common import action_chains
 from selenium.webdriver.common.by import By
@@ -21,12 +22,13 @@ from core.common.crawl_utils import to_lower_str
 from core.config.config import get_config_by_section
 from core.log.logger import logger
 
+
 class WebCrawler:
 
     def __init__(self):
         self.driver = None  # 浏览器驱动
-        self.webdriver_type = to_lower_str(get_config_by_section("webdriver","browser_type")) # 驱动类型
-        self.download_path = os.path.join(os.getcwd(), get_config_by_section("webdriver","download_path"))  # 设置浏览器下载路径
+        self.webdriver_type = to_lower_str(get_config_by_section("webdriver", "browser_type"))  # 驱动类型
+        self.download_path = os.path.join(os.getcwd(), get_config_by_section("webdriver", "download_path"))  # 设置浏览器下载路径
         os.makedirs(self.download_path, exist_ok=True)
 
     def init_webdriver(self):
@@ -47,10 +49,10 @@ class WebCrawler:
         edge_config = get_config_by_section("webdriver", self.webdriver_type)
         for argument in edge_config["arguments"]:
             edge_options.add_argument(argument)
-        edge_options.add_experimental_option("prefs",edge_config["prefs"])
+        edge_options.add_experimental_option("prefs", edge_config["prefs"])
         self.driver = webdriver.Edge(options=edge_options)
-        for cmd,cmd_args in edge_config["params"].items():
-            self.driver.execute_cdp_cmd(cmd,cmd_args)
+        for cmd, cmd_args in edge_config["params"].items():
+            self.driver.execute_cdp_cmd(cmd, cmd_args)
 
     def save_page(self, file_path: str, scale: float = 1.0):
         """
@@ -202,11 +204,11 @@ class WebCrawler:
                     self.driver.switch_to.window(window)
                     self.driver.close()
                 except Exception as e:
-                    logger.warning("关闭窗口失败：%s"%e)
+                    logger.warning("关闭窗口失败：%s" % e)
         self.driver.switch_to.window(windows[0])
 
     @staticmethod
-    def get_open_file_handle(browser_pattern: str = r"^[\S\s]+Microsoft[\s\S]+Edge$", open_text: str ="打开"):
+    def get_open_file_handle(browser_pattern: str = r"^[\S\s]+Microsoft[\s\S]+Edge$", open_text: str = "打开"):
         """获取浏览器句柄"""
         desktop = Desktop(backend="uia")
         windows = desktop.windows()
@@ -220,8 +222,8 @@ class WebCrawler:
         return None
 
     @staticmethod
-    def upload_file_by_window(handle, filepath: Union[LiteralString, str, bytes], open_text: str ="打开",
-                              input_text: str ="文件名(N):", confirm_text: str = "打开(O)"):
+    def upload_file_by_window(handle, filepath: Union[LiteralString, str, bytes], open_text: str = "打开",
+                              input_text: str = "文件名(N):", confirm_text: str = "打开(O)"):
         """通过浏览器上传文件"""
         app = Application(backend="uia").connect(handle=handle)
         main_browser = app.windows()[0]
@@ -232,16 +234,13 @@ class WebCrawler:
         open_button = file_chooser.descendants(title=confirm_text, control_type="Button")[0]
         open_button.click()
 
-    def into_frame_by_id(self, frame_id: str, timeout: int = 30):
+    def into_frame(self, by: str, frame_xpath: str, timeout: int = 30):
         """进入iframe"""
-        WebDriverWait(self.driver, timeout).until(ec.frame_to_be_available_and_switch_to_it((By.ID, frame_id)))
-
-    def into_frame_by_name(self, frame_name: str, timeout: int = 30):
-        """进入iframe"""
-        WebDriverWait(self.driver, timeout).until(ec.frame_to_be_available_and_switch_to_it((By.NAME, frame_name)))
+        WebDriverWait(self.driver, timeout).until(ec.frame_to_be_available_and_switch_to_it((by, frame_xpath)))
 
     @staticmethod
-    def wait_child_element(parent_element: WebElement, by: str, by_value: str, wait_time: int = 30) -> Optional[WebElement]:
+    def wait_child_element(parent_element: WebElement, by: str, by_value: str, wait_time: int = 30) -> Optional[
+        WebElement]:
         """
         等待某元素并返回
         :param parent_element: 父元素
@@ -284,4 +283,29 @@ class WebCrawler:
             shutil.rmtree(self.download_path)
             os.makedirs(self.download_path, exist_ok=True)
         except Exception as e:
-            logger.warning("清理下载文件夹失败:%s"%e)
+            logger.warning("清理下载文件夹失败:%s" % e)
+
+    def save_screenshot(self, file_path: Union[os.PathLike, str], filename: str = None):
+        """保存截图"""
+        if not os.path.exists(file_path):
+            os.makedirs(file_path, exist_ok=True)
+        if filename is None:
+            filename = "%s.png" % (int(time.time()))
+            time.sleep(1)
+        self.driver.save_screenshot(os.path.join(file_path, filename))
+
+    @staticmethod
+    def save_desktop_shot(out_path: Union[os.PathLike, str], filename: str = None):
+        """
+            保存元素所属窗口的截图，MenuItemWrapper的父窗口可能没有，会报错
+            pip install Pillow
+        """
+        try:
+            if not os.path.exists(out_path):
+                os.makedirs(out_path, exist_ok=True)
+            if filename is None:
+                filename = "%s.png" % (int(time.time()))
+                time.sleep(1)
+            ImageGrab.grab().save(os.path.join(out_path, filename))
+        except Exception as e:
+            raise Exception("截图失败：%s" % e)
