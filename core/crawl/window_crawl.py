@@ -16,7 +16,7 @@ from pywinauto.mouse import click
 from core.config.config import get_config
 
 
-class WindowCrawlerRebuild:
+class WindowCrawler:
 
     def __init__(self):
         self.download_dir = None  # 下载文件夹

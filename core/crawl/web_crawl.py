@@ -21,7 +21,7 @@ from typing_extensions import LiteralString
 from core.common.crawl_utils import to_lower_str
 from core.config.config import get_config_by_section
 from core.log.logger import logger
-
+from core.config.config import get_config
 
 class WebCrawler:
 
@@ -29,6 +29,7 @@ class WebCrawler:
         self.driver = None  # 浏览器驱动
         self.webdriver_type = to_lower_str(get_config_by_section("webdriver", "browser_type"))  # 驱动类型
         self.download_path = os.path.join(os.getcwd(), get_config_by_section("webdriver", "download_path"))  # 设置浏览器下载路径
+        self.will_save_photo = get_config("save_screenshot") == "True"
         os.makedirs(self.download_path, exist_ok=True)
 
     def init_webdriver(self):
@@ -287,6 +288,8 @@ class WebCrawler:
 
     def save_screenshot(self, file_path: Union[os.PathLike, str], filename: str = None):
         """保存截图"""
+        if not self.will_save_photo:
+            return
         if not os.path.exists(file_path):
             os.makedirs(file_path, exist_ok=True)
         if filename is None:

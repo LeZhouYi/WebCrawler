@@ -43,5 +43,8 @@
     "logger": {
         "level": "INFO",
         "save_path": "data\\log"
+    },
+    "instance":{
+        "save_screenshot": "True"
     }
 }
