@@ -2,6 +2,7 @@ import os
 import re
 import threading
 import time
+from os import PathLike
 from typing import Union, Optional, Sequence
 
 import cv2
@@ -128,14 +129,14 @@ class WindowCrawler:
         send_keys(keys)
 
     def save_screenshot(self, element: Union[Application, UIAWrapper], out_path: Union[os.PathLike, str],
-                        filename: str = None):
+                        filename: str = None) -> Union[PathLike, str, None]:
         """
             保存元素所属窗口的截图，MenuItemWrapper的父窗口可能没有，会报错
             pip install Pillow
         """
         try:
             if not self.will_save_photo:
-                return
+                return None
             if not os.path.exists(out_path):
                 os.makedirs(out_path, exist_ok=True)
             if filename is None:
@@ -149,7 +150,9 @@ class WindowCrawler:
                 parent = element.parent()
                 while parent and not parent.is_dialog():  # 判断是否为窗口层级
                     parent = parent.parent()
-            parent.capture_as_image().save(os.path.join(out_path, filename))
+            filepath = os.path.join(out_path, filename)
+            parent.capture_as_image().save(filepath)
+            return filepath
         except Exception as e:
             raise Exception("截图失败：%s" % e)
 

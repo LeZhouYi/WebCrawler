@@ -23,6 +23,7 @@ from core.config.config import get_config_by_section
 from core.log.logger import logger
 from core.config.config import get_config
 
+
 class WebCrawler:
 
     def __init__(self):
@@ -298,7 +299,7 @@ class WebCrawler:
         self.driver.save_screenshot(os.path.join(file_path, filename))
 
     @staticmethod
-    def save_desktop_shot(out_path: Union[os.PathLike, str], filename: str = None):
+    def save_desktop_shot(out_path: Union[os.PathLike, str], filename: str = None) -> Union[os.PathLike, str]:
         """
             保存元素所属窗口的截图，MenuItemWrapper的父窗口可能没有，会报错
             pip install Pillow
@@ -309,6 +310,8 @@ class WebCrawler:
             if filename is None:
                 filename = "%s.png" % (int(time.time()))
                 time.sleep(1)
-            ImageGrab.grab().save(os.path.join(out_path, filename))
+            filepath = os.path.join(out_path, filename)
+            ImageGrab.grab().save(filepath)
+            return filepath
         except Exception as e:
             raise Exception("截图失败：%s" % e)
