@@ -5,10 +5,8 @@ import shutil
 import time
 from typing import Optional, Union
 
-from PIL import ImageGrab
 from pywinauto import Desktop, Application
 from selenium.webdriver.common import action_chains
-from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
 from selenium import webdriver
@@ -43,7 +41,13 @@ class WebCrawler:
     def init_chrome_driver(self):
         """初始化Chrome"""
         chrome_options = ChromeOptions()
-        self.driver = webdriver.Chrome(options=chrome_options)
+        chrome_config = get_config_by_section("webdriver", self.webdriver_type)
+        for argument in chrome_config["arguments"]:
+            chrome_options.add_argument(argument)
+        if chrome_config["remote"]:
+            self.driver = webdriver.Remote(command_executor=chrome_config["remote_server"], options=chrome_options)
+        else:
+            self.driver = webdriver.Chrome(options=chrome_options)
 
     def init_edge_driver(self):
         """初始化Edge"""
@@ -53,6 +57,10 @@ class WebCrawler:
             edge_options.add_argument(argument)
         edge_options.add_experimental_option("prefs", edge_config["prefs"])
         self.driver = webdriver.Edge(options=edge_options)
+        if edge_config["remote"]:
+            self.driver = webdriver.Remote(command_executor=edge_config["remote_server"], options=edge_options)
+        else:
+            self.driver = webdriver.Edge(options=edge_options)
         for cmd, cmd_args in edge_config["params"].items():
             self.driver.execute_cdp_cmd(cmd, cmd_args)
 
@@ -297,21 +305,3 @@ class WebCrawler:
             filename = "%s.png" % (int(time.time()))
             time.sleep(1)
         self.driver.save_screenshot(os.path.join(file_path, filename))
-
-    @staticmethod
-    def save_desktop_shot(out_path: Union[os.PathLike, str], filename: str = None) -> Union[os.PathLike, str]:
-        """
-            保存元素所属窗口的截图，MenuItemWrapper的父窗口可能没有，会报错
-            pip install Pillow
-        """
-        try:
-            if not os.path.exists(out_path):
-                os.makedirs(out_path, exist_ok=True)
-            if filename is None:
-                filename = "%s.png" % (int(time.time()))
-                time.sleep(1)
-            filepath = os.path.join(out_path, filename)
-            ImageGrab.grab().save(filepath)
-            return filepath
-        except Exception as e:
-            raise Exception("截图失败：%s" % e)

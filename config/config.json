@@ -1,7 +1,7 @@
 {
     "webdriver": {
         "browser_type": "edge",
-        "download_path": "data\\download",
+        "download_path": "data/download",
         "edge": {
             "arguments": [
                 "--disable-infobars",
@@ -20,7 +20,7 @@
                 "download": {
                     "prompt_for_download": false,
                     "directory_upgrade": true,
-                    "default_directory": "data\\download"
+                    "default_directory": "data/download"
                 },
                 "user_experience": {
                     "personalization_data_consent_enabled": true
@@ -35,14 +35,29 @@
             "params": {
                 "Page.setDownloadBehavior": {
                     "behavior": "allow",
-                    "downloadPath": "data\\download"
+                    "downloadPath": "data/download"
                 }
-            }
+            },
+            "remote": false,
+            "remote_server": "http://localhost:4444"
+        },
+        "chrome": {
+            "arguments": [
+                "--disable-infobars",
+                "--disable-gpu",
+                "--start-maximized",
+                "--disable-notifications",
+                "--no-download-notification",
+                "--safebrowsing-disable-download-protection",
+                "--disable-software-rasterizer"
+            ],
+            "remote": false,
+            "remote_server": "http://localhost:4444"
         }
     },
     "logger": {
         "level": "INFO",
-        "save_path": "data\\log"
+        "save_path": "data/log"
     },
     "instance":{
         "save_screenshot": "True"
