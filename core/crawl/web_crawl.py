@@ -44,6 +44,8 @@ class WebCrawler:
         chrome_config = get_config_by_section("webdriver", self.webdriver_type)
         for argument in chrome_config["arguments"]:
             chrome_options.add_argument(argument)
+        for extension in chrome_config["extensions"]:
+            chrome_options.add_extension(extension)
         if chrome_config["remote"]:
             self.driver = webdriver.Remote(command_executor=chrome_config["remote_server"], options=chrome_options)
         else:
@@ -56,13 +58,13 @@ class WebCrawler:
         for argument in edge_config["arguments"]:
             edge_options.add_argument(argument)
         edge_options.add_experimental_option("prefs", edge_config["prefs"])
+        for extension in edge_config["extensions"]:
+            edge_options.add_extension(extension)
         self.driver = webdriver.Edge(options=edge_options)
-        if edge_config["remote"]:
-            self.driver = webdriver.Remote(command_executor=edge_config["remote_server"], options=edge_options)
-        else:
-            self.driver = webdriver.Edge(options=edge_options)
         for cmd, cmd_args in edge_config["params"].items():
             self.driver.execute_cdp_cmd(cmd, cmd_args)
+        for script in edge_config["scripts"]:
+            self.driver.execute_script(script)
 
     def save_page(self, file_path: str, scale: float = 1.0):
         """

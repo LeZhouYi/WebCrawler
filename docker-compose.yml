@@ -1,0 +1,8 @@
+# yaml 配置
+services:
+  chrome_driver:
+    image: selenium/standalone-chrome:latest
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    shm_size: "2g"

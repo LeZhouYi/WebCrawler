@@ -6,12 +6,12 @@
             "arguments": [
                 "--disable-infobars",
                 "--disable-gpu",
-                "--window-position=0,0",
-                "--window-size=1920,1080",
+                "--start-maximized",
                 "--disable-notifications",
                 "--no-download-notification",
                 "--safebrowsing-disable-download-protection",
-                "--disable-software-rasterizer"
+                "--disable-software-rasterizer",
+                "--disable-blink-features=AutomationControlled"
             ],
             "prefs": {
                 "browser": {
@@ -30,7 +30,11 @@
                 "profile.default_content_settings.popups": 0,
                 "profile.default_content_setting_values.automatic_downloads": 1,
                 "profile.default_content_setting_values.notifications": 2,
-                "profile.content_settings.pattern_pairs.*,*.multiple-automatic-downloads": 1
+                "profile.content_settings.pattern_pairs.*,*.multiple-automatic-downloads": 1,
+                "excludeSwitches": [
+                    "enable-automation"
+                ],
+                "useAutomationExtension": false
             },
             "params": {
                 "Page.setDownloadBehavior": {
@@ -38,8 +42,11 @@
                     "downloadPath": "data/download"
                 }
             },
-            "remote": false,
-            "remote_server": "http://localhost:4444"
+            "extensions": [
+            ],
+            "scripts": [
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+            ]
         },
         "chrome": {
             "arguments": [
@@ -51,15 +58,25 @@
                 "--safebrowsing-disable-download-protection",
                 "--disable-software-rasterizer"
             ],
+            "extensions": [
+            ],
             "remote": false,
             "remote_server": "http://localhost:4444"
         }
     },
     "logger": {
         "level": "INFO",
-        "save_path": "data/log"
+        "save_path": "data/log",
+        "format": "%(asctime)s-%(name)s-%(levelname)s-%(message)s",
+        "when": "D",
+        "interval": 1,
+        "backup_count": 7,
+        "encoding": "utf-8",
+        "delay": false,
+        "utc": false
     },
-    "instance":{
-        "save_screenshot": "True"
+    "crawl": {
+        "save_screenshot": true,
+        "download_dir": "data/download"
     }
 }

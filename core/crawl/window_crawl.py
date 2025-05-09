@@ -14,19 +14,19 @@ from pywinauto.controls.uiawrapper import UIAWrapper
 from pywinauto.keyboard import send_keys
 from pywinauto.mouse import click
 
-from core.config.config import get_config
+from core.config.config import get_config_by_section
 
 
 class WindowCrawler:
 
     def __init__(self):
         self.download_dir = None  # 下载文件夹
-        self.will_save_photo = get_config("save_screenshot") == "True"
+        self.will_save_photo = get_config_by_section("crawl", "save_screenshot") == "True"
         self.init_window_crawler()
 
     def init_window_crawler(self):
-        self.download_dir = os.path.join(os.getcwd(), get_config("download_dir"))
-        assert os.path.exists(self.download_dir)
+        self.download_dir = os.path.join(os.getcwd(), get_config_by_section("crawl", "download_dir"))
+        os.makedirs(self.download_dir, exist_ok=True)
 
     @staticmethod
     def start_app(filepath: Union[os.PathLike, str]):
@@ -267,3 +267,18 @@ class WindowCrawler:
             ImageGrab.grab().save(os.path.join(out_path, filename))
         except Exception as e:
             raise Exception("截图失败：%s" % e)
+
+    @staticmethod
+    def find_elements_by_app(app: Application, name_pattern: str, class_type: any = None) -> list:
+        """通过名称和类型查找所有匹配子元素"""
+        children = []
+        for window in app.windows():
+            for child in window.descendants():
+                if re.search(name_pattern, child.window_text()):
+                    if class_type is None:
+                        children.append(child)
+                        break
+                    elif isinstance(child, class_type):
+                        children.append(child)
+                        break
+        return children
